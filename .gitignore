@@ -1,0 +1,35 @@
+# Gradle
+.gradle/
+build/
+*/build/
+gradle-app.setting
+
+# Local configuration file (SDK path etc.) — machine-specific, never commit
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Keystores and signing secrets — never commit these
+*.jks
+*.keystore
+app/keystore.properties
+keystore.properties
+
+# Log/output
+*.log
+/build_output*
+/build_final*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Gradle wrapper jar is fetched by CI / `gradle wrapper` — keep the
+# properties + scripts, but no need to track the generated jar if you
+# regenerate it locally.

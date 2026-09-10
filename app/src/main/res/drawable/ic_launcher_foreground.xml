@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Glass Note Icon -->
+    <group
+        android:translateX="24"
+        android:translateY="24">
+        
+        <!-- Note paper shape with rounded corner -->
+        <path
+            android:fillColor="#6200EE"
+            android:pathData="M8,0 L52,0 C56.4,0,60,3.6,60,8 L60,52 C60,56.4,56.4,60,52,60 L8,60 C3.6,60,0,56.4,0,52 L0,8 C0,3.6,3.6,0,8,0 Z"
+            android:fillAlpha="0.9"/>
+        
+        <!-- Inner highlight for glass effect -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M8,2 L52,2 C55.3,2,58,4.7,58,8 L58,30 C58,26,55,24,52,24 L8,24 C5,24,2,26,2,30 L2,8 C2,4.7,4.7,2,8,2 Z"
+            android:fillAlpha="0.3"/>
+        
+        <!-- Lines representing text -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"
+            android:pathData="M12,20 L48,20"
+            android:strokeAlpha="0.7"/>
+        
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"
+            android:pathData="M12,30 L42,30"
+            android:strokeAlpha="0.6"/>
+        
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"
+            android:pathData="M12,40 L38,40"
+            android:strokeAlpha="0.5"/>
+    </group>
+</vector>
