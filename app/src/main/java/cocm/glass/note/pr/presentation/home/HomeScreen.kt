@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import cocm.glass.note.pr.domain.model.Note
 import cocm.glass.note.pr.ui.components.*
 import cocm.glass.note.pr.ui.theme.getNoteColor
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,85 +28,166 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onNavigateToEditor: (Long?) -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToArchive: () -> Unit,
+    onNavigateToTrash: () -> Unit,
+    onNavigateToLabels: () -> Unit,
+    onNavigateToSearch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var showSearchBar by remember { mutableStateOf(false) }
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val coroutineScope = rememberCoroutineScope()
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
-            if (showSearchBar) {
-                SearchBar(
-                    query = searchQuery,
-                    onQueryChange = {
-                        searchQuery = it
-                        viewModel.searchNotes(it)
-                    },
-                    onClose = {
-                        showSearchBar = false
-                        searchQuery = ""
-                        viewModel.searchNotes("")
-                    }
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = "Glass Notes",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
                 )
-            } else {
-                GlassTopBar(
-                    title = "Glass Notes",
-                    actions = {
-                        GlassIconButton(
-                            onClick = { showSearchBar = true },
-                            icon = Icons.Default.Search,
-                            contentDescription = "Search"
-                        )
-                        GlassIconButton(
-                            onClick = {
-                                viewModel.toggleViewMode()
-                            },
-                            icon = if (uiState.viewMode == ViewMode.GRID)
-                                Icons.Default.List else Icons.Outlined.GridView,
-                            contentDescription = "Toggle view"
-                        )
-                        GlassIconButton(
-                            onClick = onNavigateToSettings,
-                            icon = Icons.Default.Settings,
-                            contentDescription = "Settings"
-                        )
-                    }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                NavigationDrawerItem(
+                    label = { Text("Notes") },
+                    icon = { Icon(Icons.Default.Description, contentDescription = null) },
+                    selected = true,
+                    onClick = {
+                        coroutineScope.launch { drawerState.close() }
+                    },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+                NavigationDrawerItem(
+                    label = { Text("Labels") },
+                    icon = { Icon(Icons.Default.Label, contentDescription = null) },
+                    selected = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            drawerState.close()
+                            onNavigateToLabels()
+                        }
+                    },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+                NavigationDrawerItem(
+                    label = { Text("Archive") },
+                    icon = { Icon(Icons.Default.Archive, contentDescription = null) },
+                    selected = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            drawerState.close()
+                            onNavigateToArchive()
+                        }
+                    },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+                NavigationDrawerItem(
+                    label = { Text("Trash") },
+                    icon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                    selected = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            drawerState.close()
+                            onNavigateToTrash()
+                        }
+                    },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                NavigationDrawerItem(
+                    label = { Text("Settings") },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                    selected = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            drawerState.close()
+                            onNavigateToSettings()
+                        }
+                    },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
             }
-        },
-        floatingActionButton = {
-            GlassFAB(
-                onClick = { onNavigateToEditor(null) },
-                icon = Icons.Default.Add,
-                contentDescription = "Create note"
-            )
         }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            if (uiState.notes.isEmpty() && uiState.pinnedNotes.isEmpty()) {
-                EmptyState(
-                    title = "Your thoughts belong here",
-                    subtitle = "Create your first note and let Glass Notes keep it safe",
-                    icon = Icons.Default.Note,
-                    actionText = "Create Note",
-                    onActionClick = { onNavigateToEditor(null) }
+    ) {
+        Scaffold(
+            modifier = modifier.fillMaxSize(),
+            topBar = {
+                if (showSearchBar) {
+                    SearchBar(
+                        query = searchQuery,
+                        onQueryChange = {
+                            searchQuery = it
+                            viewModel.searchNotes(it)
+                        },
+                        onClose = {
+                            showSearchBar = false
+                            searchQuery = ""
+                            viewModel.searchNotes("")
+                        }
+                    )
+                } else {
+                    GlassTopBar(
+                        title = "Glass Notes",
+                        navigationIcon = Icons.Default.Menu,
+                        onNavigationClick = {
+                            coroutineScope.launch { drawerState.open() }
+                        },
+                        actions = {
+                            GlassIconButton(
+                                onClick = { showSearchBar = true },
+                                icon = Icons.Default.Search,
+                                contentDescription = "Search"
+                            )
+                            GlassIconButton(
+                                onClick = {
+                                    viewModel.toggleViewMode()
+                                },
+                                icon = if (uiState.viewMode == ViewMode.GRID)
+                                    Icons.Default.List else Icons.Outlined.GridView,
+                                contentDescription = "Toggle view"
+                            )
+                            GlassIconButton(
+                                onClick = onNavigateToSettings,
+                                icon = Icons.Default.Settings,
+                                contentDescription = "Settings"
+                            )
+                        }
+                    )
+                }
+            },
+            floatingActionButton = {
+                GlassFAB(
+                    onClick = { onNavigateToEditor(null) },
+                    icon = Icons.Default.Add,
+                    contentDescription = "Create note"
                 )
-            } else {
-                NotesContent(
-                    pinnedNotes = uiState.pinnedNotes,
-                    notes = uiState.notes,
-                    viewMode = uiState.viewMode,
-                    onNoteClick = { onNavigateToEditor(it.id) },
-                    onPinClick = { viewModel.togglePinNote(it) },
-                    onArchiveClick = { viewModel.archiveNote(it) },
-                    onDeleteClick = { viewModel.deleteNote(it) }
-                )
+            }
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                if (uiState.notes.isEmpty() && uiState.pinnedNotes.isEmpty()) {
+                    EmptyState(
+                        title = "Your thoughts belong here",
+                        subtitle = "Create your first note and let Glass Notes keep it safe",
+                        icon = Icons.Default.Note,
+                        actionText = "Create Note",
+                        onActionClick = { onNavigateToEditor(null) }
+                    )
+                } else {
+                    NotesContent(
+                        pinnedNotes = uiState.pinnedNotes,
+                        notes = uiState.notes,
+                        viewMode = uiState.viewMode,
+                        onNoteClick = { onNavigateToEditor(it.id) },
+                        onPinClick = { viewModel.togglePinNote(it) }
+                    )
+                }
             }
         }
     }
@@ -152,112 +235,99 @@ private fun NotesContent(
     notes: List<Note>,
     viewMode: ViewMode,
     onNoteClick: (Note) -> Unit,
-    onPinClick: (Note) -> Unit,
-    onArchiveClick: (Note) -> Unit,
-    onDeleteClick: (Note) -> Unit
+    onPinClick: (Note) -> Unit
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        if (pinnedNotes.isNotEmpty()) {
-            item {
-                Text(
-                    text = "PINNED",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-                )
-            }
-            
-            item {
-                if (viewMode == ViewMode.GRID) {
-                    NoteGrid(
-                        notes = pinnedNotes,
-                        onNoteClick = onNoteClick,
-                        onPinClick = onPinClick
-                    )
-                } else {
-                    NoteList(
-                        notes = pinnedNotes,
-                        onNoteClick = onNoteClick,
-                        onPinClick = onPinClick
-                    )
-                }
-            }
-        }
-
-        if (notes.isNotEmpty()) {
+    if (viewMode == ViewMode.GRID) {
+        LazyVerticalStaggeredGrid(
+            columns = StaggeredGridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalItemSpacing = 12.dp
+        ) {
             if (pinnedNotes.isNotEmpty()) {
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
+                item(span = StaggeredGridItemSpan.FullLine) {
                     Text(
-                        text = "OTHER NOTES",
+                        text = "PINNED",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                    )
+                }
+                items(pinnedNotes, key = { "pinned_${it.id}" }) { note ->
+                    NoteCard(
+                        note = note,
+                        onClick = { onNoteClick(note) },
+                        onPinClick = { onPinClick(note) }
                     )
                 }
             }
-            
-            item {
-                if (viewMode == ViewMode.GRID) {
-                    NoteGrid(
-                        notes = notes,
-                        onNoteClick = onNoteClick,
-                        onPinClick = onPinClick
-                    )
-                } else {
-                    NoteList(
-                        notes = notes,
-                        onNoteClick = onNoteClick,
-                        onPinClick = onPinClick
+
+            if (notes.isNotEmpty()) {
+                if (pinnedNotes.isNotEmpty()) {
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "OTHER NOTES",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                        )
+                    }
+                }
+                items(notes, key = { "note_${it.id}" }) { note ->
+                    NoteCard(
+                        note = note,
+                        onClick = { onNoteClick(note) },
+                        onPinClick = { onPinClick(note) }
                     )
                 }
             }
         }
-    }
-}
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (pinnedNotes.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "PINNED",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                    )
+                }
+                items(pinnedNotes, key = { "pinned_${it.id}" }) { note ->
+                    NoteCard(
+                        note = note,
+                        onClick = { onNoteClick(note) },
+                        onPinClick = { onPinClick(note) }
+                    )
+                }
+            }
 
-@Composable
-private fun NoteGrid(
-    notes: List<Note>,
-    onNoteClick: (Note) -> Unit,
-    onPinClick: (Note) -> Unit
-) {
-    LazyVerticalStaggeredGrid(
-        columns = StaggeredGridCells.Fixed(2),
-        modifier = Modifier.height(((notes.size / 2 + 1) * 150).dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalItemSpacing = 12.dp,
-        userScrollEnabled = false
-    ) {
-        items(notes, key = { it.id }) { note ->
-            NoteCard(
-                note = note,
-                onClick = { onNoteClick(note) },
-                onPinClick = { onPinClick(note) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun NoteList(
-    notes: List<Note>,
-    onNoteClick: (Note) -> Unit,
-    onPinClick: (Note) -> Unit
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        notes.forEach { note ->
-            NoteCard(
-                note = note,
-                onClick = { onNoteClick(note) },
-                onPinClick = { onPinClick(note) }
-            )
+            if (notes.isNotEmpty()) {
+                if (pinnedNotes.isNotEmpty()) {
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "OTHER NOTES",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                        )
+                    }
+                }
+                items(notes, key = { "note_${it.id}" }) { note ->
+                    NoteCard(
+                        note = note,
+                        onClick = { onNoteClick(note) },
+                        onPinClick = { onPinClick(note) }
+                    )
+                }
+            }
         }
     }
 }
@@ -297,7 +367,7 @@ private fun NoteCard(
                     )
                 }
             }
-            
+
             AnimatedVisibility(visible = note.isPinned) {
                 Icon(
                     imageVector = Icons.Default.PushPin,

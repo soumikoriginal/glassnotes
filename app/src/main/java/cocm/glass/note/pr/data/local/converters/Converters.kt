@@ -14,7 +14,11 @@ class Converters {
     fun fromNoteType(value: NoteType): String = value.name
 
     @TypeConverter
-    fun toNoteType(value: String): NoteType = NoteType.valueOf(value)
+    fun toNoteType(value: String): NoteType = try {
+        NoteType.valueOf(value)
+    } catch (e: Exception) {
+        NoteType.TEXT
+    }
 
     @TypeConverter
     fun fromNoteColor(value: NoteColor): String = value.name

@@ -71,6 +71,18 @@ fun GlassNotesNavigation(
                 },
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
+                },
+                onNavigateToArchive = {
+                    navController.navigate(Screen.Archive.route)
+                },
+                onNavigateToTrash = {
+                    navController.navigate(Screen.Trash.route)
+                },
+                onNavigateToLabels = {
+                    navController.navigate(Screen.Labels.route)
+                },
+                onNavigateToSearch = {
+                    navController.navigate(Screen.Search.route)
                 }
             )
         }
@@ -80,7 +92,6 @@ fun GlassNotesNavigation(
             arguments = listOf(
                 navArgument("noteId") {
                     type = NavType.LongType
-                    nullable = true
                     defaultValue = -1L
                 }
             )
@@ -124,7 +135,7 @@ fun GlassNotesNavigation(
                     navController.popBackStack()
                 },
                 onLabelClick = { label ->
-                    // Navigate to filtered notes view (could be implemented later)
+                    // Navigate to filtered notes view
                 }
             )
         }
@@ -165,14 +176,9 @@ fun GlassNotesNavigation(
             )
             SettingsScreen(
                 viewModel = viewModel,
+                container = container,
                 onNavigateBack = {
                     navController.popBackStack()
-                },
-                onBackupClick = {
-                    // TODO: Implement backup
-                },
-                onRestoreClick = {
-                    // TODO: Implement restore
                 }
             )
         }

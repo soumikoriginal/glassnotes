@@ -62,11 +62,11 @@ class BackupManager(private val context: Context) {
         put("isDeleted", isDeleted)
         put("createdAt", createdAt)
         put("updatedAt", updatedAt)
-        put("reminderTime", reminderTime)
+        put("reminderTime", reminderTime ?: JSONObject.NULL)
         put("hasReminder", hasReminder)
         put("labels", JSONArray(labels))
         put("imagePaths", JSONArray(imagePaths))
-        put("drawingPath", drawingPath)
+        put("drawingPath", drawingPath ?: JSONObject.NULL)
 
         // Checklist data
         val checklistArray = JSONArray()
@@ -127,7 +127,7 @@ class BackupManager(private val context: Context) {
             hasReminder = json.optBoolean("hasReminder", false),
             labels = labels,
             imagePaths = imagePaths,
-            drawingPath = json.optString("drawingPath").takeIf { it.isNotEmpty() },
+            drawingPath = json.optString("drawingPath").takeIf { it.isNotEmpty() && it != "null" },
             checklistData = checklistData
         )
     }

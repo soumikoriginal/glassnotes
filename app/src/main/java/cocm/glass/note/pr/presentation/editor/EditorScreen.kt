@@ -1,19 +1,31 @@
 package cocm.glass.note.pr.presentation.editor
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import cocm.glass.note.pr.di.AppContainer
 import cocm.glass.note.pr.domain.model.NoteColor
 import cocm.glass.note.pr.domain.model.NoteType
 import cocm.glass.note.pr.presentation.components.*
 import cocm.glass.note.pr.ui.components.*
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,8 +40,18 @@ fun EditorScreen(
     var showColorPicker by remember { mutableStateOf(false) }
     var showLabelPicker by remember { mutableStateOf(false) }
     var showReminderPicker by remember { mutableStateOf(false) }
-    var showImagePicker by remember { mutableStateOf(false) }
     var showDrawingCanvas by remember { mutableStateOf(false) }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            val savedPath = container.imageHelper.saveImageFromUri(it)
+            if (savedPath != null) {
+                viewModel.addImage(savedPath)
+            }
+        }
+    }
 
     LaunchedEffect(noteId) {
         if (noteId != null) {
@@ -51,7 +73,7 @@ fun EditorScreen(
                     GlassIconButton(
                         onClick = { viewModel.togglePin() },
                         icon = if (uiState.note?.isPinned == true)
-                            Icons.Default.PushPin else Icons.Default.PushPin,
+                            Icons.Filled.PushPin else Icons.Outlined.PushPin,
                         contentDescription = "Pin note",
                         tint = if (uiState.note?.isPinned == true)
                             MaterialTheme.colorScheme.primary
@@ -81,7 +103,7 @@ fun EditorScreen(
             EditorBottomBar(
                 noteType = uiState.note?.noteType ?: NoteType.TEXT,
                 onChecklistClick = { viewModel.addChecklistItem() },
-                onImageClick = { showImagePicker = true },
+                onImageClick = { imagePickerLauncher.launch("image/*") },
                 onDrawingClick = { showDrawingCanvas = true },
                 onColorClick = { showColorPicker = true },
                 onLabelClick = { showLabelPicker = true },
@@ -95,6 +117,38 @@ fun EditorScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp)
         ) {
+            // Labels display
+            val labels = uiState.note?.labels ?: emptyList()
+            if (labels.isNotEmpty()) {
+                item {
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(labels) { label ->
+                            InputChip(
+                                selected = true,
+                                onClick = { },
+                                label = { Text(label) },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Remove label",
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clickable {
+                                                viewModel.updateLabels(labels.filter { it != label })
+                                            }
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             item {
                 // Title field
                 GlassTextField(
@@ -109,7 +163,71 @@ fun EditorScreen(
                         .padding(vertical = 8.dp)
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            // Attached Drawing preview
+            if (uiState.drawingPath != null) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .padding(vertical = 8.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    ) {
+                        AsyncImage(
+                            model = File(uiState.drawingPath!!),
+                            contentDescription = "Drawing",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                        IconButton(
+                            onClick = { viewModel.removeDrawing() },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Remove drawing",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Attached Images preview
+            if (uiState.imagePaths.isNotEmpty()) {
+                items(uiState.imagePaths) { imagePath ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .padding(vertical = 6.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    ) {
+                        AsyncImage(
+                            model = File(imagePath),
+                            contentDescription = "Attached image",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        IconButton(
+                            onClick = { viewModel.removeImage(imagePath) },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Remove image",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
             }
 
             // Checklist items
@@ -183,6 +301,18 @@ fun EditorScreen(
             onReminderSet = { viewModel.setReminder(it) },
             onReminderRemove = { viewModel.removeReminder() },
             onDismiss = { showReminderPicker = false }
+        )
+    }
+
+    if (showDrawingCanvas) {
+        DrawingDialog(
+            onDrawingSaved = { bitmap ->
+                val path = container.drawingHelper.saveDrawing(bitmap)
+                if (path != null) {
+                    viewModel.setDrawing(path)
+                }
+            },
+            onDismiss = { showDrawingCanvas = false }
         )
     }
 }

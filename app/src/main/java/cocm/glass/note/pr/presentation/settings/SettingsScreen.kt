@@ -1,5 +1,9 @@
 package cocm.glass.note.pr.presentation.settings
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -9,19 +13,67 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import cocm.glass.note.pr.di.AppContainer
 import cocm.glass.note.pr.ui.components.*
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+
+private fun String.capitalized(): String =
+    replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    onNavigateBack: () -> Unit,
-    onBackupClick: () -> Unit,
-    onRestoreClick: () -> Unit
+    container: AppContainer,
+    onNavigateBack: () -> Unit
 ) {
     val settingsState by viewModel.settingsState.collectAsState()
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    var showThemeDialog by remember { mutableStateOf(false) }
+    var showIntensityDialog by remember { mutableStateOf(false) }
+    var showViewModeDialog by remember { mutableStateOf(false) }
+    var showSortOrderDialog by remember { mutableStateOf(false) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        uri?.let {
+            scope.launch {
+                val notes = container.noteRepository.getAllNotes().first()
+                val result = container.backupManager.exportBackup(notes, it)
+                if (result.isSuccess) {
+                    snackbarHostState.showSnackbar("Backup exported successfully (${notes.size} notes)")
+                } else {
+                    snackbarHostState.showSnackbar("Failed to export: ${result.exceptionOrNull()?.message}")
+                }
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            scope.launch {
+                val result = container.backupManager.importBackup(it)
+                if (result.isSuccess) {
+                    val notes = result.getOrNull() ?: emptyList()
+                    notes.forEach { note ->
+                        container.noteRepository.insertNote(note)
+                    }
+                    snackbarHostState.showSnackbar("Restored ${notes.size} notes successfully")
+                } else {
+                    snackbarHostState.showSnackbar("Failed to restore: ${result.exceptionOrNull()?.message}")
+                }
+            }
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             GlassTopBar(
                 title = "Settings",
@@ -42,18 +94,18 @@ fun SettingsScreen(
                 SettingsSection(title = "Appearance") {
                     SettingsItem(
                         title = "Theme",
-                        subtitle = settingsState.theme.name.lowercase().capitalize(),
+                        subtitle = settingsState.theme.name.lowercase().capitalized(),
                         icon = Icons.Default.Palette,
-                        onClick = { /* Show theme picker */ }
+                        onClick = { showThemeDialog = true }
                     )
-                    
+
                     SettingsItem(
                         title = "Glass Intensity",
-                        subtitle = settingsState.glassIntensity.name.lowercase().capitalize(),
+                        subtitle = settingsState.glassIntensity.name.lowercase().capitalized(),
                         icon = Icons.Default.Opacity,
-                        onClick = { /* Show intensity picker */ }
+                        onClick = { showIntensityDialog = true }
                     )
-                    
+
                     SettingsSwitchItem(
                         title = "Dynamic Background",
                         subtitle = "Subtle animated background",
@@ -61,14 +113,14 @@ fun SettingsScreen(
                         checked = settingsState.dynamicBackground,
                         onCheckedChange = viewModel::setDynamicBackground
                     )
-                    
+
                     SettingsItem(
                         title = "View Mode",
-                        subtitle = settingsState.viewMode.name.lowercase().capitalize(),
+                        subtitle = settingsState.viewMode.name.lowercase().capitalized(),
                         icon = Icons.Default.ViewModule,
-                        onClick = { /* Show view mode picker */ }
+                        onClick = { showViewModeDialog = true }
                     )
-                    
+
                     SettingsSwitchItem(
                         title = "Reduce Motion",
                         subtitle = "Disable animations",
@@ -91,7 +143,7 @@ fun SettingsScreen(
                             SortOrder.CUSTOM -> "Custom"
                         },
                         icon = Icons.Default.Sort,
-                        onClick = { /* Show sort picker */ }
+                        onClick = { showSortOrderDialog = true }
                     )
                 }
             }
@@ -101,16 +153,20 @@ fun SettingsScreen(
                 SettingsSection(title = "Backup & Restore") {
                     SettingsItem(
                         title = "Export Backup",
-                        subtitle = "Save notes to local file",
+                        subtitle = "Save notes to local JSON file",
                         icon = Icons.Default.Upload,
-                        onClick = onBackupClick
+                        onClick = {
+                            exportLauncher.launch("glass_notes_backup_${System.currentTimeMillis()}.json")
+                        }
                     )
-                    
+
                     SettingsItem(
                         title = "Import Backup",
-                        subtitle = "Restore from backup file",
+                        subtitle = "Restore from JSON backup file",
                         icon = Icons.Default.Download,
-                        onClick = onRestoreClick
+                        onClick = {
+                            importLauncher.launch(arrayOf("application/json", "*/*"))
+                        }
                     )
                 }
             }
@@ -125,11 +181,11 @@ fun SettingsScreen(
                         checked = settingsState.appLockEnabled,
                         onCheckedChange = viewModel::setAppLock
                     )
-                    
+
                     if (settingsState.appLockEnabled) {
                         SettingsSwitchItem(
                             title = "Biometric Unlock",
-                            subtitle = "Use fingerprint or face",
+                            subtitle = "Use fingerprint, face, or device PIN",
                             icon = Icons.Default.Fingerprint,
                             checked = settingsState.biometricEnabled,
                             onCheckedChange = viewModel::setBiometric
@@ -147,10 +203,10 @@ fun SettingsScreen(
                         icon = Icons.Default.Info,
                         onClick = { }
                     )
-                    
+
                     SettingsItem(
                         title = "Privacy",
-                        subtitle = "Your notes. Your device. Your privacy.",
+                        subtitle = "Your notes. Your device. Fully offline.",
                         icon = Icons.Default.PrivacyTip,
                         onClick = { }
                     )
@@ -158,6 +214,107 @@ fun SettingsScreen(
             }
         }
     }
+
+    // Dialogs
+    if (showThemeDialog) {
+        SingleChoiceDialog(
+            title = "Choose Theme",
+            options = listOf(
+                Theme.SYSTEM to "System Default",
+                Theme.LIGHT to "Light",
+                Theme.DARK to "Dark"
+            ),
+            selectedOption = settingsState.theme,
+            onSelect = { viewModel.setTheme(it) },
+            onDismiss = { showThemeDialog = false }
+        )
+    }
+
+    if (showIntensityDialog) {
+        SingleChoiceDialog(
+            title = "Glass Intensity",
+            options = listOf(
+                GlassIntensity.LOW to "Low",
+                GlassIntensity.MEDIUM to "Medium",
+                GlassIntensity.HIGH to "High"
+            ),
+            selectedOption = settingsState.glassIntensity,
+            onSelect = { viewModel.setGlassIntensity(it) },
+            onDismiss = { showIntensityDialog = false }
+        )
+    }
+
+    if (showViewModeDialog) {
+        SingleChoiceDialog(
+            title = "Default View Mode",
+            options = listOf(
+                ViewMode.GRID to "Grid (2 columns)",
+                ViewMode.LIST to "List (Single column)"
+            ),
+            selectedOption = settingsState.viewMode,
+            onSelect = { viewModel.setViewMode(it) },
+            onDismiss = { showViewModeDialog = false }
+        )
+    }
+
+    if (showSortOrderDialog) {
+        SingleChoiceDialog(
+            title = "Sort Notes By",
+            options = listOf(
+                SortOrder.LAST_EDITED to "Last edited",
+                SortOrder.CREATED to "Created date",
+                SortOrder.ALPHABETICAL to "Alphabetical (A-Z)"
+            ),
+            selectedOption = settingsState.sortOrder,
+            onSelect = { viewModel.setSortOrder(it) },
+            onDismiss = { showSortOrderDialog = false }
+        )
+    }
+}
+
+@Composable
+fun <T> SingleChoiceDialog(
+    title: String,
+    options: List<Pair<T, String>>,
+    selectedOption: T,
+    onSelect: (T) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                options.forEach { (option, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onSelect(option)
+                                onDismiss()
+                            }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = (option == selectedOption),
+                            onClick = {
+                                onSelect(option)
+                                onDismiss()
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -173,7 +330,7 @@ fun SettingsSection(
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
         )
-        
+
         GlassCard {
             Column(
                 modifier = Modifier.fillMaxWidth()
@@ -207,22 +364,22 @@ fun SettingsItem(
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary
             )
-            
+
             Spacer(modifier = Modifier.width(16.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyLarge
                 )
-                
+
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
-            
+
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
@@ -255,22 +412,22 @@ fun SettingsSwitchItem(
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary
             )
-            
+
             Spacer(modifier = Modifier.width(16.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyLarge
                 )
-                
+
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
-            
+
             GlassSwitch(
                 checked = checked,
                 onCheckedChange = onCheckedChange

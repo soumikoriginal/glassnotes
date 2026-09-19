@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import cocm.glass.note.pr.GlassNotesApplication
-import cocm.glass.note.pr.util.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -16,12 +15,13 @@ class ReminderReceiver : BroadcastReceiver() {
         if (noteId == -1L) return
 
         val noteTitle = intent.getStringExtra("NOTE_TITLE") ?: "Reminder"
+        val pendingResult = goAsync()
 
         val app = context.applicationContext as GlassNotesApplication
         val notificationHelper = app.container.notificationHelper
         val noteRepository = app.container.noteRepository
 
-        // Get the note content for the notification
+        // Get the note content for the notification safely with goAsync
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val note = noteRepository.getNoteById(noteId)
@@ -39,6 +39,8 @@ class ReminderReceiver : BroadcastReceiver() {
                     title = noteTitle,
                     content = ""
                 )
+            } finally {
+                pendingResult.finish()
             }
         }
     }

@@ -419,3 +419,144 @@ fun ChecklistItemRow(
         )
     }
 }
+
+@Composable
+fun DrawingDialog(
+    onDrawingSaved: (android.graphics.Bitmap) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val paths = remember { mutableStateListOf<List<androidx.compose.ui.geometry.Offset>>() }
+    var currentPath = remember { mutableStateListOf<androidx.compose.ui.geometry.Offset>() }
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        GlassCard(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.85f)
+                .padding(8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Drawing Canvas",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Row {
+                        TextButton(onClick = {
+                            paths.clear()
+                            currentPath.clear()
+                        }) {
+                            Text("Clear")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        GlassIconButton(
+                            onClick = onDismiss,
+                            icon = Icons.Default.Close
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White)
+                ) {
+                    androidx.compose.foundation.Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .androidx.compose.ui.input.pointer.pointerInput(Unit) {
+                                androidx.compose.foundation.gestures.detectDragGestures(
+                                    onDragStart = { offset ->
+                                        currentPath = mutableStateListOf(offset)
+                                    },
+                                    onDrag = { change, _ ->
+                                        currentPath.add(change.position)
+                                    },
+                                    onDragEnd = {
+                                        if (currentPath.isNotEmpty()) {
+                                            paths.add(currentPath.toList())
+                                            currentPath = mutableStateListOf()
+                                        }
+                                    }
+                                )
+                            }
+                    ) {
+                        for (path in paths) {
+                            for (i in 0 until path.size - 1) {
+                                drawLine(
+                                    color = Color.Black,
+                                    start = path[i],
+                                    end = path[i + 1],
+                                    strokeWidth = 6f,
+                                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                )
+                            }
+                        }
+                        for (i in 0 until currentPath.size - 1) {
+                            drawLine(
+                                color = Color.Black,
+                                start = currentPath[i],
+                                end = currentPath[i + 1],
+                                strokeWidth = 6f,
+                                cap = androidx.compose.ui.graphics.StrokeCap.Round
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Button(
+                        onClick = {
+                            val bitmap = android.graphics.Bitmap.createBitmap(800, 800, android.graphics.Bitmap.Config.ARGB_8888)
+                            val canvas = android.graphics.Canvas(bitmap)
+                            canvas.drawColor(android.graphics.Color.WHITE)
+                            val paint = android.graphics.Paint().apply {
+                                color = android.graphics.Color.BLACK
+                                strokeWidth = 6f
+                                style = android.graphics.Paint.Style.STROKE
+                                strokeCap = android.graphics.Paint.Cap.ROUND
+                                strokeJoin = android.graphics.Paint.Join.ROUND
+                                isAntiAlias = true
+                            }
+                            for (path in paths) {
+                                for (i in 0 until path.size - 1) {
+                                    canvas.drawLine(path[i].x, path[i].y, path[i + 1].x, path[i + 1].y, paint)
+                                }
+                            }
+                            onDrawingSaved(bitmap)
+                            onDismiss()
+                        }
+                    ) {
+                        Text("Save Drawing")
+                    }
+                }
+            }
+        }
+    }
+}
+

@@ -25,10 +25,9 @@ import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
 
-    // Tracks whether the app-lock gate is currently shown. Starts true so a
-    // cold start with App Lock enabled never has a frame where notes are
-    // visible before the lock check completes.
+    // Tracks whether the app-lock gate is currently shown.
     private var isLocked by mutableStateOf(true)
+    private var isAppInBackground = false
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op either way */ }
@@ -42,16 +41,14 @@ class MainActivity : FragmentActivity() {
         val container = app.container
 
         setContent {
-            val themeMode by container.preferencesManager.themeMode.collectAsState(initial = "system")
-            val isDarkTheme = when (themeMode) {
-                "dark" -> true
-                "light" -> false
+            val themeMode by container.preferencesManager.themeMode.collectAsState(initial = "SYSTEM")
+            val isDarkTheme = when (themeMode.uppercase()) {
+                "DARK" -> true
+                "LIGHT" -> false
                 else -> isSystemInDarkTheme()
             }
 
-            val isOnboardingComplete by container.preferencesManager.isOnboardingComplete.collectAsState(initial = false)
-            var showOnboarding by remember { mutableStateOf(!isOnboardingComplete) }
-
+            val isOnboardingComplete by container.preferencesManager.isOnboardingComplete.collectAsState(initial = null)
             val appLockEnabled by container.preferencesManager.appLockEnabled.collectAsState(initial = false)
             val useBiometric by container.preferencesManager.useBiometric.collectAsState(initial = true)
 
@@ -66,10 +63,12 @@ class MainActivity : FragmentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     when {
-                        showOnboarding -> {
+                        isOnboardingComplete == null -> {
+                            // Initial reading from DataStore in progress
+                        }
+                        isOnboardingComplete == false -> {
                             OnboardingScreen(
                                 onFinish = {
-                                    showOnboarding = false
                                     lifecycleScope.launch {
                                         container.preferencesManager.setOnboardingComplete()
                                     }
@@ -83,7 +82,7 @@ class MainActivity : FragmentActivity() {
                                     container.biometricHelper.authenticate(
                                         activity = this@MainActivity,
                                         onSuccess = { isLocked = false },
-                                        onError = { /* keep locked; user can retry via the Unlock button */ },
+                                        onError = { /* keep locked; user can retry via Unlock button */ },
                                         onFailed = { /* keep locked; user can retry */ }
                                     )
                                 }
@@ -101,15 +100,21 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    override fun onStop() {
+        super.onStop()
+        isAppInBackground = true
+    }
+
     override fun onResume() {
         super.onResume()
-        // Re-lock whenever the app comes back to the foreground (e.g. after
-        // being backgrounded), if App Lock is turned on.
-        val app = application as GlassNotesApplication
-        lifecycleScope.launch {
-            val enabled = app.container.preferencesManager.appLockEnabled.first()
-            if (enabled) {
-                isLocked = true
+        if (isAppInBackground) {
+            isAppInBackground = false
+            val app = application as GlassNotesApplication
+            lifecycleScope.launch {
+                val enabled = app.container.preferencesManager.appLockEnabled.first()
+                if (enabled) {
+                    isLocked = true
+                }
             }
         }
     }

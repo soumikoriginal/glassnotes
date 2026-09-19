@@ -7,15 +7,15 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 
 class BiometricHelper(private val context: Context) {
-    
+
+    private val authenticators =
+        BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+
     fun isBiometricAvailable(): Boolean {
         val biometricManager = BiometricManager.from(context)
-        return when (biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)) {
-            BiometricManager.BIOMETRIC_SUCCESS -> true
-            else -> false
-        }
+        return biometricManager.canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
     }
-    
+
     fun authenticate(
         activity: FragmentActivity,
         onSuccess: () -> Unit,
@@ -23,7 +23,7 @@ class BiometricHelper(private val context: Context) {
         onFailed: () -> Unit
     ) {
         val executor = ContextCompat.getMainExecutor(context)
-        
+
         val biometricPrompt = BiometricPrompt(activity, executor,
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
@@ -44,14 +44,13 @@ class BiometricHelper(private val context: Context) {
                     onFailed()
                 }
             })
-        
+
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Unlock Glass Notes")
-            .setSubtitle("Authenticate to access your notes")
-            .setNegativeButtonText("Cancel")
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+            .setSubtitle("Authenticate using Biometrics or Device PIN/Pattern")
+            .setAllowedAuthenticators(authenticators)
             .build()
-        
+
         biometricPrompt.authenticate(promptInfo)
     }
 }
